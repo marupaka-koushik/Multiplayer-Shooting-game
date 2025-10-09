@@ -4,6 +4,9 @@ project(MiniMilitiaClone)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Include directories
+include_directories(${CMAKE_SOURCE_DIR}/include)
+
 # Find raylib
 find_package(raylib QUIET)
 if (NOT raylib_FOUND)
@@ -12,15 +15,37 @@ if (NOT raylib_FOUND)
     pkg_check_modules(RAYLIB REQUIRED raylib)
 endif()
 
+# Shared game library (common code for both server and client)
+set(SHARED_SOURCES
+    src/Player.cpp
+    src/Bullet.cpp
+    src/GameState.cpp
+    src/NetworkManager.cpp
+)
+
+add_library(GameShared STATIC ${SHARED_SOURCES})
+target_include_directories(GameShared PUBLIC ${CMAKE_SOURCE_DIR}/include)
+
+# Client-specific sources (with graphics)
+set(CLIENT_SOURCES
+    src/GameRenderer.cpp
+    src/InputHandler.cpp
+)
+
 # Server executable (no graphics needed)
 add_executable(server
     server.cpp
 )
 
+target_link_libraries(server GameShared)
+
 # Client executable (with raylib graphics)
 add_executable(client
     client.cpp
+    ${CLIENT_SOURCES}
 )
+
+target_link_libraries(client GameShared)
 
 # Link raylib to client only
 if (raylib_FOUND)
