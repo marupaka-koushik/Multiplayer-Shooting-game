@@ -15,7 +15,7 @@ public:
     // Main rendering
     void beginFrame();
     void endFrame();
-    void render(const GameState& gameState);
+    void render(const GameState& gameState, int localPlayerId = -1);
     
     // Individual rendering functions
     void renderBackground();

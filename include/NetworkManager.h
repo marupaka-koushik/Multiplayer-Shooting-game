@@ -40,6 +40,7 @@ public:
     // Client specific  
     bool connectToServer(const std::string& serverIP, int port);
     void setServerAddress(const std::string& serverIP, int port);
+    sockaddr_in getServerAddress() const { return serverAddr_; }
     
     // Utility
     std::string getLastError() const { return lastError_; }

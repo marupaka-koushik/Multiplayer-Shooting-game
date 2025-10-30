@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <chrono>
+#include <sstream>
 #include "GameState.h"
 #include "GameRenderer.h"
 #include "InputHandler.h"
@@ -34,8 +35,7 @@ public:
         joinMessage.data = playerName;
         joinMessage.playerId = 0; // Will be assigned by server
         
-        sockaddr_in serverAddr;
-        networkManager_.sendMessage(joinMessage, serverAddr);
+        networkManager_.sendMessage(joinMessage, networkManager_.getServerAddress());
         
         std::cout << "Connected to server: " << serverIP << ":" << SERVER_PORT << std::endl;
         connected_ = true;
@@ -46,16 +46,6 @@ public:
     void run() {
         auto lastUpdate = std::chrono::high_resolution_clock::now();
         
-        // Add a local test player for immediate visual feedback
-        gameState_.addPlayer(1, "TestPlayer");
-        Player* localPlayer = gameState_.getPlayer(1);
-        if (localPlayer) {
-            localPlayer->setPosition(400, 300); // Center of screen
-            localPlayer->setHealth(100);
-            localPlayer->setAlive(true);
-        }
-        playerId_ = 1; // Set as our local player
-        
         while (!renderer_.shouldClose() && connected_) {
             auto currentTime = std::chrono::high_resolution_clock::now();
             float deltaTime = std::chrono::duration<float>(currentTime - lastUpdate).count();
@@ -63,12 +53,14 @@ public:
             // Cap deltaTime to prevent large jumps
             if (deltaTime > 0.016f) deltaTime = 0.016f;
             
-            // Handle input
-            inputHandler_.update();
-            handleInput();
-            
-            // Process network messages
+            // Process network messages first to get player ID and game state
             processNetworkMessages();
+            
+            // Handle input only if we have a valid player ID
+            if (playerId_ != -1) {
+                inputHandler_.update();
+                handleInput();
+            }
             
             // Update local game state (prediction)
             gameState_.update(deltaTime);
@@ -79,8 +71,8 @@ public:
                 renderer_.updateCamera(*localPlayer);
             }
             
-            // Render everything in one go
-            renderer_.render(gameState_);
+            // Render everything in one go, passing local player ID
+            renderer_.render(gameState_, playerId_);
             
             lastUpdate = currentTime;
         }
@@ -93,8 +85,7 @@ public:
             disconnectMessage.type = MessageType::PLAYER_LEAVE;
             disconnectMessage.playerId = playerId_;
             
-            sockaddr_in serverAddr;
-            networkManager_.sendMessage(disconnectMessage, serverAddr);
+            networkManager_.sendMessage(disconnectMessage, networkManager_.getServerAddress());
         }
         
         networkManager_.cleanup();
@@ -147,11 +138,18 @@ private:
         
         // Handle shooting
         if (input.shoot) {
-            // Add a bullet locally for immediate feedback
-            static int bulletId = 1000;
-            gameState_.addBullet(bulletId++, playerId_, 
-                               localPlayer->getX() + 10, localPlayer->getY() + 10, 
-                               angle, 400.0f);
+            // Send shoot message to server
+            NetworkMessage shootMessage;
+            shootMessage.type = MessageType::PLAYER_SHOOT;
+            shootMessage.playerId = playerId_;
+            
+            std::ostringstream oss;
+            oss << localPlayer->getX() + 10 << "," 
+                << localPlayer->getY() + 10 << "," 
+                << angle;
+            shootMessage.data = oss.str();
+            
+            networkManager_.sendMessage(shootMessage, networkManager_.getServerAddress());
         }
         
         // Send input to server (for multiplayer sync later)
@@ -168,8 +166,7 @@ private:
             
             moveMessage.data = moveData;
             
-            sockaddr_in serverAddr;
-            networkManager_.sendMessage(moveMessage, serverAddr);
+            networkManager_.sendMessage(moveMessage, networkManager_.getServerAddress());
         }
     }
     

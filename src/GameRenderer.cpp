@@ -51,7 +51,7 @@ void GameRenderer::endFrame() {
     // This method is now unused - rendering is handled in render()
 }
 
-void GameRenderer::render(const GameState& gameState) {
+void GameRenderer::render(const GameState& gameState, int localPlayerId) {
     if (!initialized_) return;
     
     // Single BeginDrawing call for entire frame
@@ -68,7 +68,7 @@ void GameRenderer::render(const GameState& gameState) {
     const auto& players = gameState.getAllPlayers();
     for (const Player* player : players) {
         if (player && player->isAlive()) {
-            bool isLocal = (player->getId() == 1); // Our test player
+            bool isLocal = (player->getId() == localPlayerId);
             renderPlayer(*player, isLocal);
         }
     }

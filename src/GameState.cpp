@@ -191,7 +191,95 @@ std::string GameState::serialize() const {
 }
 
 void GameState::deserialize(const std::string& data) {
-    // Implementation for deserializing game state from network
-    // This would parse the serialized string and update the game state
-    // For now, this is a placeholder - you'd implement the parsing logic here
+    // Parse the serialized game state
+    // Format: "PLAYERS:count:id:name:x:y:health:alive:angle:...|BULLETS:count:id:ownerId:x:y:..."
+    
+    size_t pipePos = data.find('|');
+    std::string playerData = data.substr(0, pipePos);
+    std::string bulletData = (pipePos != std::string::npos) ? data.substr(pipePos + 1) : "";
+    
+    // Parse players
+    std::istringstream playerStream(playerData);
+    std::string token;
+    
+    // Skip "PLAYERS:" prefix and get count
+    std::getline(playerStream, token, ':'); // "PLAYERS"
+    std::getline(playerStream, token, ':'); // count
+    int playerCount = std::stoi(token);
+    
+    // Clear existing players that aren't in the update
+    std::map<int, bool> updatedPlayers;
+    
+    for (int i = 0; i < playerCount; i++) {
+        std::getline(playerStream, token, ':'); // id
+        int id = std::stoi(token);
+        
+        std::getline(playerStream, token, ':'); // name
+        std::string name = token;
+        
+        std::getline(playerStream, token, ':'); // x
+        float x = std::stof(token);
+        
+        std::getline(playerStream, token, ':'); // y
+        float y = std::stof(token);
+        
+        std::getline(playerStream, token, ':'); // health
+        int health = std::stoi(token);
+        
+        std::getline(playerStream, token, ':'); // alive
+        bool alive = std::stoi(token) == 1;
+        
+        std::getline(playerStream, token, ':'); // angle
+        float angle = std::stof(token);
+        
+        // Update or add player
+        Player* player = getPlayer(id);
+        if (player == nullptr) {
+            addPlayer(id, name);
+            player = getPlayer(id);
+        }
+        
+        if (player) {
+            player->setPosition(x, y);
+            player->setHealth(health);
+            player->setAlive(alive);
+            player->setAngle(angle);
+            updatedPlayers[id] = true;
+        }
+    }
+    
+    // Parse bullets if present
+    if (!bulletData.empty()) {
+        std::istringstream bulletStream(bulletData);
+        
+        // Skip "BULLETS:" prefix and get count
+        std::getline(bulletStream, token, ':'); // "BULLETS"
+        std::getline(bulletStream, token, ':'); // count
+        int bulletCount = std::stoi(token);
+        
+        // Clear existing bullets
+        for (auto it = bullets_.begin(); it != bullets_.end();) {
+            Bullet* bullet = *it;
+            bulletMap_.erase(bullet->getId());
+            delete bullet;
+            it = bullets_.erase(it);
+        }
+        
+        for (int i = 0; i < bulletCount; i++) {
+            std::getline(bulletStream, token, ':'); // id
+            int id = std::stoi(token);
+            
+            std::getline(bulletStream, token, ':'); // ownerId
+            int ownerId = std::stoi(token);
+            
+            std::getline(bulletStream, token, ':'); // x
+            float x = std::stof(token);
+            
+            std::getline(bulletStream, token, ':'); // y
+            float y = std::stof(token);
+            
+            // Add bullet (with default angle and speed for now)
+            addBullet(id, ownerId, x, y, 0, 400.0f);
+        }
+    }
 }
