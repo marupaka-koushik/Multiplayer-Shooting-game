@@ -1,9 +1,11 @@
 #include "GameRenderer.h"
 #include <iostream>
+#include <cmath>
 
 GameRenderer::GameRenderer() 
     : windowWidth_(800), windowHeight_(600), initialized_(false) {
-    camera_.target = {0, 0};
+    // Initialize camera to center of world
+    camera_.target = {400, 300};
     camera_.offset = {windowWidth_ / 2.0f, windowHeight_ / 2.0f};
     camera_.rotation = 0.0f;
     camera_.zoom = 1.0f;
@@ -115,18 +117,31 @@ void GameRenderer::render(const GameState& gameState, int localPlayerId) {
 }
 
 void GameRenderer::renderBackground() {
-    // Clean background with better colors
-    DrawRectangle(0, 0, 800, 600, Color{220, 235, 255, 255}); // Light sky blue
+    // Calculate visible world bounds based on camera
+    Vector2 topLeft = GetScreenToWorld2D({0, 0}, camera_);
+    Vector2 bottomRight = GetScreenToWorld2D({(float)windowWidth_, (float)windowHeight_}, camera_);
     
-    // Subtle grid for visual reference
-    for (int x = 0; x < 800; x += 100) {
-        DrawLine(x, 0, x, 600, Color{200, 200, 200, 100}); // Light gray, semi-transparent
+    // Draw sky background covering the entire visible area
+    DrawRectangle(topLeft.x - 100, topLeft.y - 100, 
+                  bottomRight.x - topLeft.x + 200, 
+                  bottomRight.y - topLeft.y + 200, 
+                  Color{220, 235, 255, 255}); // Light sky blue
+    
+    // Draw grid for visual reference across the whole world
+    int gridSize = 100;
+    int startX = ((int)topLeft.x / gridSize - 1) * gridSize;
+    int endX = ((int)bottomRight.x / gridSize + 1) * gridSize;
+    int startY = ((int)topLeft.y / gridSize - 1) * gridSize;
+    int endY = ((int)bottomRight.y / gridSize + 1) * gridSize;
+    
+    for (int x = startX; x <= endX; x += gridSize) {
+        DrawLine(x, startY, x, endY, Color{200, 200, 200, 100});
     }
-    for (int y = 0; y < 600; y += 100) {
-        DrawLine(0, y, 800, y, Color{200, 200, 200, 100});
+    for (int y = startY; y <= endY; y += gridSize) {
+        DrawLine(startX, y, endX, y, Color{200, 200, 200, 100});
     }
     
-    // Add some visual landmarks
+    // Add some visual landmarks (these are in world coordinates)
     DrawRectangle(100, 500, 600, 100, Color{34, 139, 34, 255}); // Ground platform
     DrawRectangle(300, 400, 200, 20, Color{139, 69, 19, 255});  // Small platform
 }

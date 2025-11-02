@@ -56,6 +56,12 @@ public:
             // Process network messages first to get player ID and game state
             processNetworkMessages();
             
+            // Update camera to follow local player - do this before input handling
+            Player* localPlayer = gameState_.getPlayer(playerId_);
+            if (localPlayer) {
+                renderer_.updateCamera(*localPlayer);
+            }
+            
             // Handle input only if we have a valid player ID
             if (playerId_ != -1) {
                 inputHandler_.update();
@@ -64,12 +70,6 @@ public:
             
             // Update local game state (prediction)
             gameState_.update(deltaTime);
-            
-            // Update camera to follow local player
-            Player* localPlayer = gameState_.getPlayer(playerId_);
-            if (localPlayer) {
-                renderer_.updateCamera(*localPlayer);
-            }
             
             // Render everything in one go, passing local player ID
             renderer_.render(gameState_, playerId_);
