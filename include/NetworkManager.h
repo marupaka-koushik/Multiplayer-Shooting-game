@@ -8,6 +8,7 @@ enum class MessageType {
     PLAYER_LEAVE,
     PLAYER_MOVE,
     PLAYER_SHOOT,
+    PLAYER_RESPAWN,
     GAME_STATE_UPDATE,
     PING,
     PONG

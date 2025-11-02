@@ -86,6 +86,30 @@ void GameRenderer::render(const GameState& gameState, int localPlayerId) {
     // UI rendering (screen space)
     renderUI(gameState);
     
+    // Check if local player is dead and show respawn message
+    const Player* localPlayer = nullptr;
+    for (const Player* player : players) {
+        if (player && player->getId() == localPlayerId) {
+            localPlayer = player;
+            break;
+        }
+    }
+    
+    if (localPlayer && !localPlayer->isAlive()) {
+        // Draw semi-transparent overlay
+        DrawRectangle(0, 0, windowWidth_, windowHeight_, Color{0, 0, 0, 150});
+        
+        // Draw death message
+        const char* deathMsg = "YOU DIED";
+        int deathMsgWidth = MeasureText(deathMsg, 60);
+        DrawText(deathMsg, windowWidth_/2 - deathMsgWidth/2, windowHeight_/2 - 60, 60, RED);
+        
+        // Draw respawn instruction
+        const char* respawnMsg = "Press R to Respawn";
+        int respawnMsgWidth = MeasureText(respawnMsg, 30);
+        DrawText(respawnMsg, windowWidth_/2 - respawnMsgWidth/2, windowHeight_/2 + 20, 30, WHITE);
+    }
+    
     // Single EndDrawing call
     EndDrawing();
 }

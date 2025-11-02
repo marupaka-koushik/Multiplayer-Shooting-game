@@ -108,18 +108,34 @@ private:
         
         if (!localPlayer) return;
         
+        // Check if player is dead - allow only respawn input
+        if (!localPlayer->isAlive()) {
+            // Handle respawn request
+            if (IsKeyPressed(KEY_R)) {
+                NetworkMessage respawnMessage;
+                respawnMessage.type = MessageType::PLAYER_RESPAWN;
+                respawnMessage.playerId = playerId_;
+                respawnMessage.data = "";
+                networkManager_.sendMessage(respawnMessage, networkManager_.getServerAddress());
+                std::cout << "Requesting respawn..." << std::endl;
+            }
+            // Reset velocity for dead player
+            localPlayer->setVelocity(0, 0);
+            return;
+        }
+        
         // Local movement for immediate feedback - 4 directions
+        // Only process movement if player is alive
         float moveSpeed = 200.0f;
         float velX = 0, velY = 0;
         
-        if (input.moveLeft) {
+        // Use IsKeyDown directly for all movement keys to ensure consistent behavior
+        if (IsKeyDown(KEY_A)) {
             velX = -moveSpeed;
         }
-        if (input.moveRight) {
+        if (IsKeyDown(KEY_D)) {
             velX = moveSpeed;
         }
-        
-        // Check for up/down movement (W/S keys)
         if (IsKeyDown(KEY_W)) {
             velY = -moveSpeed; // Move up
         }
@@ -136,7 +152,7 @@ private:
         float angle = atan2(mousePos.y - playerPos.y, mousePos.x - playerPos.x);
         localPlayer->setAngle(angle);
         
-        // Handle shooting
+        // Handle shooting - only if alive
         if (input.shoot) {
             // Send shoot message to server
             NetworkMessage shootMessage;
@@ -152,20 +168,27 @@ private:
             networkManager_.sendMessage(shootMessage, networkManager_.getServerAddress());
         }
         
-        // Send input to server (for multiplayer sync later)
-        if (input.moveLeft || input.moveRight || IsKeyDown(KEY_W) || IsKeyDown(KEY_S)) {
+        // Send input to server (for multiplayer sync) - only send if there's actual movement
+        if (IsKeyDown(KEY_A) || IsKeyDown(KEY_D) || IsKeyDown(KEY_W) || IsKeyDown(KEY_S)) {
             NetworkMessage moveMessage;
             moveMessage.type = MessageType::PLAYER_MOVE;
             moveMessage.playerId = playerId_;
             
             std::string moveData = "";
-            if (input.moveLeft) moveData += "LEFT,";
-            if (input.moveRight) moveData += "RIGHT,";
+            if (IsKeyDown(KEY_A)) moveData += "LEFT,";
+            if (IsKeyDown(KEY_D)) moveData += "RIGHT,";
             if (IsKeyDown(KEY_W)) moveData += "UP,";
             if (IsKeyDown(KEY_S)) moveData += "DOWN,";
             
             moveMessage.data = moveData;
             
+            networkManager_.sendMessage(moveMessage, networkManager_.getServerAddress());
+        } else {
+            // Send stop movement message when no keys are pressed
+            NetworkMessage moveMessage;
+            moveMessage.type = MessageType::PLAYER_MOVE;
+            moveMessage.playerId = playerId_;
+            moveMessage.data = "STOP,";
             networkManager_.sendMessage(moveMessage, networkManager_.getServerAddress());
         }
     }

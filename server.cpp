@@ -3,6 +3,7 @@
 #include <chrono>
 #include <thread>
 #include <sstream>
+#include <cstdlib>
 #include "GameState.h"
 #include "NetworkManager.h"
 
@@ -93,23 +94,29 @@ private:
             }
             case MessageType::PLAYER_MOVE: {
                 Player* player = gameState_.getPlayer(message.playerId);
-                if (player) {
-                    // Parse movement data: "LEFT,RIGHT,UP,DOWN,"
+                if (player && player->isAlive()) {
+                    // Parse movement data: "LEFT,RIGHT,UP,DOWN," or "STOP,"
                     std::string moveData = message.data;
                     float velX = 0, velY = 0;
                     float moveSpeed = 200.0f;
                     
-                    if (moveData.find("LEFT") != std::string::npos) {
-                        velX = -moveSpeed;
-                    }
-                    if (moveData.find("RIGHT") != std::string::npos) {
-                        velX = moveSpeed;
-                    }
-                    if (moveData.find("UP") != std::string::npos) {
-                        velY = -moveSpeed;
-                    }
-                    if (moveData.find("DOWN") != std::string::npos) {
-                        velY = moveSpeed;
+                    if (moveData.find("STOP") != std::string::npos) {
+                        // Player stopped moving
+                        velX = 0;
+                        velY = 0;
+                    } else {
+                        if (moveData.find("LEFT") != std::string::npos) {
+                            velX = -moveSpeed;
+                        }
+                        if (moveData.find("RIGHT") != std::string::npos) {
+                            velX = moveSpeed;
+                        }
+                        if (moveData.find("UP") != std::string::npos) {
+                            velY = -moveSpeed;
+                        }
+                        if (moveData.find("DOWN") != std::string::npos) {
+                            velY = moveSpeed;
+                        }
                     }
                     
                     player->setVelocity(velX, velY);
@@ -117,11 +124,11 @@ private:
                 break;
             }
             case MessageType::PLAYER_SHOOT: {
-                // Handle shooting
-                // Format: "x,y,angle"
+                // Handle shooting - only if player is alive
                 Player* player = gameState_.getPlayer(message.playerId);
-                if (player) {
+                if (player && player->isAlive()) {
                     // Parse shooting data
+                    // Format: "x,y,angle"
                     std::istringstream iss(message.data);
                     std::string token;
                     float x, y, angle;
@@ -135,6 +142,18 @@ private:
                     
                     static int bulletIdCounter = 1;
                     gameState_.addBullet(bulletIdCounter++, message.playerId, x, y, angle, 400.0f);
+                }
+                break;
+            }
+            case MessageType::PLAYER_RESPAWN: {
+                // Handle player respawn request
+                Player* player = gameState_.getPlayer(message.playerId);
+                if (player && !player->isAlive()) {
+                    // Respawn at a random position
+                    float spawnX = 100.0f + (rand() % 600);
+                    float spawnY = 100.0f + (rand() % 400);
+                    player->respawn(spawnX, spawnY);
+                    std::cout << "Player " << message.playerId << " (" << player->getName() << ") respawned" << std::endl;
                 }
                 break;
             }
