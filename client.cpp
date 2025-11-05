@@ -2,6 +2,7 @@
 #include <string>
 #include <chrono>
 #include <sstream>
+#include <cmath>
 #include "GameState.h"
 #include "GameRenderer.h"
 #include "InputHandler.h"

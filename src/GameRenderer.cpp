@@ -126,25 +126,57 @@ void GameRenderer::renderBackground() {
     Vector2 topLeft = GetScreenToWorld2D({0, 0}, camera_);
     Vector2 bottomRight = GetScreenToWorld2D({(float)windowWidth_, (float)windowHeight_}, camera_);
     
-    // Draw sky background covering the entire visible area
+    // World boundaries (matching server's 800x600)
+    const float worldWidth = 800.0f;
+    const float worldHeight = 600.0f;
+    
+    // Draw out-of-bounds area (darker/different color) to show it's not playable
     DrawRectangle(topLeft.x - 100, topLeft.y - 100, 
                   bottomRight.x - topLeft.x + 200, 
                   bottomRight.y - topLeft.y + 200, 
-                  Color{220, 235, 255, 255}); // Light sky blue
+                  Color{40, 40, 60, 255}); // Dark blue-gray for out of bounds
     
-    // Draw grid for visual reference across the whole world
+    // Draw the playable map area with sky background
+    DrawRectangle(0, 0, worldWidth, worldHeight, Color{220, 235, 255, 255}); // Light sky blue
+    
+    // Draw grid for visual reference within the playable world only
     int gridSize = 100;
-    int startX = ((int)topLeft.x / gridSize - 1) * gridSize;
-    int endX = ((int)bottomRight.x / gridSize + 1) * gridSize;
-    int startY = ((int)topLeft.y / gridSize - 1) * gridSize;
-    int endY = ((int)bottomRight.y / gridSize + 1) * gridSize;
+    for (int x = 0; x <= (int)worldWidth; x += gridSize) {
+        DrawLine(x, 0, x, worldHeight, Color{200, 200, 200, 100});
+    }
+    for (int y = 0; y <= (int)worldHeight; y += gridSize) {
+        DrawLine(0, y, worldWidth, y, Color{200, 200, 200, 100});
+    }
     
-    for (int x = startX; x <= endX; x += gridSize) {
-        DrawLine(x, startY, x, endY, Color{200, 200, 200, 100});
-    }
-    for (int y = startY; y <= endY; y += gridSize) {
-        DrawLine(startX, y, endX, y, Color{200, 200, 200, 100});
-    }
+    // Draw thick boundary walls around the map
+    int wallThickness = 10;
+    
+    // Top wall
+    DrawRectangle(0, -wallThickness, worldWidth, wallThickness, Color{100, 100, 100, 255});
+    DrawRectangle(0, 0, worldWidth, 3, Color{60, 60, 60, 255}); // Inner shadow
+    
+    // Bottom wall
+    DrawRectangle(0, worldHeight, worldWidth, wallThickness, Color{100, 100, 100, 255});
+    DrawRectangle(0, worldHeight - 3, worldWidth, 3, Color{180, 180, 180, 255}); // Inner highlight
+    
+    // Left wall
+    DrawRectangle(-wallThickness, 0, wallThickness, worldHeight, Color{100, 100, 100, 255});
+    DrawRectangle(0, 0, 3, worldHeight, Color{60, 60, 60, 255}); // Inner shadow
+    
+    // Right wall
+    DrawRectangle(worldWidth, 0, wallThickness, worldHeight, Color{100, 100, 100, 255});
+    DrawRectangle(worldWidth - 3, 0, 3, worldHeight, Color{180, 180, 180, 255}); // Inner highlight
+    
+    // Draw corner markers for extra visibility
+    int cornerSize = 20;
+    // Top-left corner
+    DrawRectangle(0, 0, cornerSize, cornerSize, Color{255, 0, 0, 180});
+    // Top-right corner
+    DrawRectangle(worldWidth - cornerSize, 0, cornerSize, cornerSize, Color{255, 0, 0, 180});
+    // Bottom-left corner
+    DrawRectangle(0, worldHeight - cornerSize, cornerSize, cornerSize, Color{255, 0, 0, 180});
+    // Bottom-right corner
+    DrawRectangle(worldWidth - cornerSize, worldHeight - cornerSize, cornerSize, cornerSize, Color{255, 0, 0, 180});
     
     // Add some visual landmarks (these are in world coordinates)
     DrawRectangle(100, 500, 600, 100, Color{34, 139, 34, 255}); // Ground platform

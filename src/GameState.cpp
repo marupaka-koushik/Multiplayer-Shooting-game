@@ -192,7 +192,9 @@ std::string GameState::serialize() const {
             oss << ":" << bullet->getId()
                 << ":" << bullet->getOwnerId()
                 << ":" << bullet->getX()
-                << ":" << bullet->getY();
+                << ":" << bullet->getY()
+                << ":" << bullet->getVelX()
+                << ":" << bullet->getVelY();
         }
     }
     
@@ -257,6 +259,19 @@ void GameState::deserialize(const std::string& data) {
         }
     }
     
+    // Remove players that weren't in the update (disconnected players)
+    for (auto it = players_.begin(); it != players_.end();) {
+        Player* player = *it;
+        if (updatedPlayers.find(player->getId()) == updatedPlayers.end()) {
+            // Player not in update, remove them
+            playerMap_.erase(player->getId());
+            delete player;
+            it = players_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    
     // Parse bullets if present
     if (!bulletData.empty()) {
         std::istringstream bulletStream(bulletData);
@@ -287,8 +302,18 @@ void GameState::deserialize(const std::string& data) {
             std::getline(bulletStream, token, ':'); // y
             float y = std::stof(token);
             
-            // Add bullet (with default angle and speed for now)
-            addBullet(id, ownerId, x, y, 0, 400.0f);
+            std::getline(bulletStream, token, ':'); // velX
+            float velX = std::stof(token);
+            
+            std::getline(bulletStream, token, ':'); // velY
+            float velY = std::stof(token);
+            
+            // Add bullet with placeholder values, then set correct velocity
+            addBullet(id, ownerId, x, y, 0, 0);
+            Bullet* bullet = getBullet(id);
+            if (bullet) {
+                bullet->setVelocity(velX, velY);
+            }
         }
     }
 }

@@ -20,6 +20,11 @@ void Bullet::setPosition(float x, float y) {
     y_ = y;
 }
 
+void Bullet::setVelocity(float velX, float velY) {
+    velX_ = velX;
+    velY_ = velY;
+}
+
 void Bullet::setActive(bool active) {
     active_ = active;
 }

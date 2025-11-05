@@ -17,6 +17,7 @@ public:
     
     // Setters
     void setPosition(float x, float y);
+    void setVelocity(float velX, float velY);
     void setActive(bool active);
     
     // Game logic
