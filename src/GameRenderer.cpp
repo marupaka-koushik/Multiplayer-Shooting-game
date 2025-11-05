@@ -1,6 +1,8 @@
 #include "GameRenderer.h"
 #include <iostream>
 #include <cmath>
+#include <algorithm>
+#include <vector>
 
 GameRenderer::GameRenderer() 
     : windowWidth_(800), windowHeight_(600), initialized_(false) {
@@ -87,6 +89,9 @@ void GameRenderer::render(const GameState& gameState, int localPlayerId) {
     
     // UI rendering (screen space)
     renderUI(gameState);
+    
+    // Render leaderboard
+    renderLeaderboard(gameState);
     
     // Check if local player is dead and show respawn message
     const Player* localPlayer = nullptr;
@@ -225,6 +230,71 @@ void GameRenderer::renderHUD(const Player* localPlayer) {
     DrawCircleLines(mousePos.x, mousePos.y, 10, RED);
     DrawLine(mousePos.x - 5, mousePos.y, mousePos.x + 5, mousePos.y, RED);
     DrawLine(mousePos.x, mousePos.y - 5, mousePos.x, mousePos.y + 5, RED);
+}
+
+void GameRenderer::renderLeaderboard(const GameState& gameState) {
+    const auto& players = gameState.getAllPlayers();
+    if (players.empty()) return;
+    
+    // Create a sorted list of players by kills
+    std::vector<const Player*> sortedPlayers(players.begin(), players.end());
+    std::sort(sortedPlayers.begin(), sortedPlayers.end(), 
+              [](const Player* a, const Player* b) {
+                  return a->getKills() > b->getKills();
+              });
+    
+    // Leaderboard position and size
+    int boardX = windowWidth_ - 220;
+    int boardY = 50;
+    int boardWidth = 210;
+    int maxEntries = 5;
+    int entryHeight = 25;
+    int headerHeight = 30;
+    int boardHeight = headerHeight + (std::min((int)sortedPlayers.size(), maxEntries) * entryHeight) + 10;
+    
+    // Draw leaderboard background
+    DrawRectangle(boardX, boardY, boardWidth, boardHeight, Color{0, 0, 0, 180});
+    DrawRectangleLines(boardX, boardY, boardWidth, boardHeight, Color{255, 215, 0, 255}); // Gold border
+    
+    // Draw header
+    const char* title = "LEADERBOARD";
+    int titleWidth = MeasureText(title, 18);
+    DrawText(title, boardX + (boardWidth - titleWidth) / 2, boardY + 5, 18, Color{255, 215, 0, 255});
+    
+    // Draw column headers
+    DrawText("Player", boardX + 10, boardY + headerHeight, 14, Color{200, 200, 200, 255});
+    DrawText("K", boardX + 130, boardY + headerHeight, 14, Color{100, 255, 100, 255});
+    DrawText("D", boardX + 160, boardY + headerHeight, 14, Color{255, 100, 100, 255});
+    
+    // Draw top players
+    int yPos = boardY + headerHeight + 20;
+    for (int i = 0; i < std::min(maxEntries, (int)sortedPlayers.size()); i++) {
+        const Player* player = sortedPlayers[i];
+        
+        // Rank color
+        Color rankColor = WHITE;
+        if (i == 0) rankColor = Color{255, 215, 0, 255}; // Gold
+        else if (i == 1) rankColor = Color{192, 192, 192, 255}; // Silver
+        else if (i == 2) rankColor = Color{205, 127, 50, 255}; // Bronze
+        
+        // Draw rank number
+        DrawText(TextFormat("%d.", i + 1), boardX + 5, yPos, 14, rankColor);
+        
+        // Draw player name (truncate if too long)
+        std::string playerName = player->getName();
+        if (playerName.length() > 10) {
+            playerName = playerName.substr(0, 9) + "..";
+        }
+        DrawText(playerName.c_str(), boardX + 25, yPos, 14, WHITE);
+        
+        // Draw kills
+        DrawText(TextFormat("%d", player->getKills()), boardX + 130, yPos, 14, Color{100, 255, 100, 255});
+        
+        // Draw deaths
+        DrawText(TextFormat("%d", player->getDeaths()), boardX + 160, yPos, 14, Color{255, 100, 100, 255});
+        
+        yPos += entryHeight;
+    }
 }
 
 bool GameRenderer::shouldClose() const {

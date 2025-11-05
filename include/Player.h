@@ -16,6 +16,8 @@ public:
     int getHealth() const { return health_; }
     bool isAlive() const { return alive_; }
     float getAngle() const { return angle_; }
+    int getKills() const { return kills_; }
+    int getDeaths() const { return deaths_; }
     
     // Setters
     void setPosition(float x, float y);
@@ -27,8 +29,11 @@ public:
     // Game logic
     void update(float deltaTime);
     void takeDamage(int damage);
+    void takeDamage(int damage, int killerId);
     void respawn(float x, float y);
     bool checkCollision(float x, float y, float width, float height) const;
+    void addKill();
+    void addDeath();
     
 private:
     int id_;
@@ -40,4 +45,6 @@ private:
     bool alive_;
     float angle_;
     float speed_;
+    int kills_;
+    int deaths_;
 };

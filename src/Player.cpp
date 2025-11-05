@@ -3,12 +3,14 @@
 
 Player::Player() 
     : id_(0), name_(""), x_(0), y_(0), velX_(0), velY_(0), 
-      health_(100), maxHealth_(100), alive_(true), angle_(0), speed_(200.0f) {
+      health_(100), maxHealth_(100), alive_(true), angle_(0), speed_(200.0f),
+      kills_(0), deaths_(0) {
 }
 
 Player::Player(int id, const std::string& name, float x, float y)
     : id_(id), name_(name), x_(x), y_(y), velX_(0), velY_(0),
-      health_(100), maxHealth_(100), alive_(true), angle_(0), speed_(200.0f) {
+      health_(100), maxHealth_(100), alive_(true), angle_(0), speed_(200.0f),
+      kills_(0), deaths_(0) {
 }
 
 void Player::setPosition(float x, float y) {
@@ -58,7 +60,27 @@ void Player::takeDamage(int damage) {
     if (health_ <= 0) {
         health_ = 0;
         alive_ = false;
+        deaths_++;
     }
+}
+
+void Player::takeDamage(int damage, int killerId) {
+    if (!alive_) return;
+    
+    health_ -= damage;
+    if (health_ <= 0) {
+        health_ = 0;
+        alive_ = false;
+        deaths_++;
+    }
+}
+
+void Player::addKill() {
+    kills_++;
+}
+
+void Player::addDeath() {
+    deaths_++;
 }
 
 void Player::respawn(float x, float y) {

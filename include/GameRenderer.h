@@ -23,6 +23,7 @@ public:
     void renderBullet(const Bullet& bullet);
     void renderUI(const GameState& gameState);
     void renderHUD(const Player* localPlayer);
+    void renderLeaderboard(const GameState& gameState);
     
     // Utility
     bool shouldClose() const;

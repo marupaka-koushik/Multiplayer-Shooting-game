@@ -119,8 +119,17 @@ void GameState::checkPlayerBulletCollisions() {
             
             if (bullet->checkCollision(player->getX(), player->getY(), 20, 20)) {
                 // Hit detected
+                bool wasAlive = player->isAlive();
                 player->takeDamage(bullet->getDamage());
                 bullet->setActive(false);
+                
+                // Award kill if player died from this hit
+                if (wasAlive && !player->isAlive()) {
+                    Player* shooter = getPlayer(bullet->getOwnerId());
+                    if (shooter) {
+                        shooter->addKill();
+                    }
+                }
                 break;
             }
         }
