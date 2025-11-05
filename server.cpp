@@ -25,7 +25,7 @@ public:
             return false;
         }
         
-        gameState_.setWorldSize(800, 600);
+        gameState_.setWorldSize(2000, 1500);
         
         std::cout << "Game server initialized on port " << PORT << std::endl;
         return true;
@@ -158,10 +158,8 @@ private:
                 // Handle player respawn request
                 Player* player = gameState_.getPlayer(message.playerId);
                 if (player && !player->isAlive()) {
-                    // Respawn at a random position
-                    float spawnX = 100.0f + (rand() % 600);
-                    float spawnY = 100.0f + (rand() % 400);
-                    player->respawn(spawnX, spawnY);
+                    // Respawn at a random valid position (not overlapping obstacles)
+                    gameState_.respawnPlayer(message.playerId);
                     std::cout << "Player " << message.playerId << " (" << player->getName() << ") respawned" << std::endl;
                 }
                 break;

@@ -3,7 +3,8 @@
 #include <algorithm>
 
 GameState::GameState() 
-    : worldWidth_(800), worldHeight_(600), nextPlayerId_(1), nextBulletId_(1) {
+    : worldWidth_(2000), worldHeight_(1500), nextPlayerId_(1), nextBulletId_(1) {
+    initializeObstacles();
 }
 
 GameState::~GameState() {
@@ -22,9 +23,9 @@ void GameState::addPlayer(int id, const std::string& name) {
         return;
     }
     
-    // Create new player at random spawn position
-    float spawnX = worldWidth_ * 0.1f + (rand() % (int)(worldWidth_ * 0.8f));
-    float spawnY = worldHeight_ * 0.5f;
+    // Find a valid spawn position
+    float spawnX, spawnY;
+    findValidSpawnPosition(spawnX, spawnY);
     
     Player* newPlayer = new Player(id, name, spawnX, spawnY);
     players_.push_back(newPlayer);
@@ -85,12 +86,41 @@ Bullet* GameState::getBullet(int id) {
 }
 
 void GameState::update(float deltaTime) {
-    // Update all players
+    // Apply movement to all players with collision checking
     for (Player* player : players_) {
-        player->update(deltaTime);
+        if (!player->isAlive()) continue;
+        
+        float velX = player->getVelX();
+        float velY = player->getVelY();
+        
+        if (velX == 0 && velY == 0) continue; // No movement
+        
+        float currentX = player->getX();
+        float currentY = player->getY();
+        float newX = currentX + velX * deltaTime;
+        float newY = currentY + velY * deltaTime;
+        
+        const float playerSize = 40.0f;
+        
+        // Check if new position would collide
+        if (checkObstacleCollision(newX, newY, playerSize, playerSize)) {
+            // Try sliding along X axis only
+            if (!checkObstacleCollision(newX, currentY, playerSize, playerSize)) {
+                player->setPosition(newX, currentY);
+            }
+            // Try sliding along Y axis only
+            else if (!checkObstacleCollision(currentX, newY, playerSize, playerSize)) {
+                player->setPosition(currentX, newY);
+            }
+            // Can't move, stay in place
+            // Position unchanged
+        } else {
+            // Safe to move to new position
+            player->setPosition(newX, newY);
+        }
     }
     
-    // Update all bullets
+    // Update all bullets (they move freely)
     for (Bullet* bullet : bullets_) {
         bullet->update(deltaTime);
     }
@@ -107,6 +137,8 @@ void GameState::update(float deltaTime) {
 
 void GameState::checkCollisions() {
     checkPlayerBulletCollisions();
+    checkBulletObstacleCollisions();
+    checkPlayerObstacleCollisions();
 }
 
 void GameState::checkPlayerBulletCollisions() {
@@ -117,7 +149,8 @@ void GameState::checkPlayerBulletCollisions() {
             if (!player->isAlive()) continue;
             if (player->getId() == bullet->getOwnerId()) continue; // Don't hit yourself
             
-            if (bullet->checkCollision(player->getX(), player->getY(), 20, 20)) {
+            // Updated hitbox size to match new player size (40x40)
+            if (bullet->checkCollision(player->getX(), player->getY(), 40, 40)) {
                 // Hit detected
                 bool wasAlive = player->isAlive();
                 player->takeDamage(bullet->getDamage());
@@ -140,12 +173,36 @@ void GameState::checkPlayerBoundaries() {
     for (Player* player : players_) {
         float x = player->getX();
         float y = player->getY();
+        float velX = player->getVelX();
+        float velY = player->getVelY();
+        bool positionChanged = false;
         
-        // Keep players within world bounds
-        if (x < 0) player->setPosition(0, y);
-        if (x > worldWidth_ - 20) player->setPosition(worldWidth_ - 20, y);
-        if (y < 0) player->setPosition(x, 0);
-        if (y > worldHeight_ - 20) player->setPosition(x, worldHeight_ - 20);
+        // Keep players within world bounds (updated for 40x40 player size)
+        if (x < 0) {
+            x = 0;
+            velX = 0;
+            positionChanged = true;
+        }
+        if (x > worldWidth_ - 40) {
+            x = worldWidth_ - 40;
+            velX = 0;
+            positionChanged = true;
+        }
+        if (y < 0) {
+            y = 0;
+            velY = 0;
+            positionChanged = true;
+        }
+        if (y > worldHeight_ - 40) {
+            y = worldHeight_ - 40;
+            velY = 0;
+            positionChanged = true;
+        }
+        
+        if (positionChanged) {
+            player->setPosition(x, y);
+            player->setVelocity(velX, velY);
+        }
     }
 }
 
@@ -315,5 +372,222 @@ void GameState::deserialize(const std::string& data) {
                 bullet->setVelocity(velX, velY);
             }
         }
+    }
+}
+
+void GameState::initializeObstacles() {
+    // Initialize all obstacles matching the renderer's map layout EXACTLY
+    obstacles_.clear();
+    
+    // === CENTRAL AREA ===
+    // Central building/bunker (main structure, not door/windows)
+    obstacles_.push_back(Obstacle(812, 1000, 375, 375));
+    
+    // Central vertical walls for cover
+    obstacles_.push_back(Obstacle(950, 700, 100, 200));
+    
+    // === LEFT SIDE STRUCTURES ===
+    // Left corner bunker
+    obstacles_.push_back(Obstacle(50, 1150, 200, 225));
+    
+    // Left mid platforms
+    obstacles_.push_back(Obstacle(125, 875, 300, 50));
+    obstacles_.push_back(Obstacle(200, 925, 38, 450)); // Support pillar left
+    obstacles_.push_back(Obstacle(312, 925, 38, 450)); // Support pillar right
+    
+    // Left upper platform
+    obstacles_.push_back(Obstacle(375, 500, 250, 38));
+    
+    // Left side walls and obstacles
+    obstacles_.push_back(Obstacle(250, 1100, 150, 50)); // Horizontal wall
+    obstacles_.push_back(Obstacle(150, 600, 50, 200)); // Vertical wall
+    obstacles_.push_back(Obstacle(450, 750, 50, 150)); // Vertical wall
+    
+    // === RIGHT SIDE STRUCTURES ===
+    // Right corner bunker
+    obstacles_.push_back(Obstacle(1750, 1150, 200, 225));
+    
+    // Right mid platforms
+    obstacles_.push_back(Obstacle(1575, 875, 300, 50));
+    obstacles_.push_back(Obstacle(1650, 925, 38, 450)); // Support pillar left
+    obstacles_.push_back(Obstacle(1762, 925, 38, 450)); // Support pillar right
+    
+    // Right upper platform
+    obstacles_.push_back(Obstacle(1375, 500, 250, 38));
+    
+    // Right side walls and obstacles
+    obstacles_.push_back(Obstacle(1600, 1100, 150, 50)); // Horizontal wall
+    obstacles_.push_back(Obstacle(1800, 600, 50, 200)); // Vertical wall
+    obstacles_.push_back(Obstacle(1500, 750, 50, 150)); // Vertical wall
+    
+    // === TOP AREA ===
+    // Top center platform
+    obstacles_.push_back(Obstacle(875, 300, 250, 50));
+    
+    // Top left and right platforms
+    obstacles_.push_back(Obstacle(200, 200, 200, 40));
+    obstacles_.push_back(Obstacle(1600, 200, 200, 40));
+    
+    // Top floating obstacles
+    obstacles_.push_back(Obstacle(600, 400, 80, 80));
+    obstacles_.push_back(Obstacle(1320, 400, 80, 80));
+    
+    // === MIDDLE AREA OBSTACLES ===
+    // Scattered cover boxes/crates
+    // Left-center crates
+    obstacles_.push_back(Obstacle(450, 1300, 100, 75));
+    obstacles_.push_back(Obstacle(575, 1275, 88, 100));
+    
+    // Right-center crates
+    obstacles_.push_back(Obstacle(1300, 1300, 100, 75));
+    obstacles_.push_back(Obstacle(1425, 1275, 88, 100));
+    
+    // Mid-level scattered crates
+    obstacles_.push_back(Obstacle(250, 1000, 75, 75));
+    obstacles_.push_back(Obstacle(1200, 1300, 75, 75));
+    obstacles_.push_back(Obstacle(750, 1300, 75, 75));
+    
+    // Small obstacles for tactical cover
+    obstacles_.push_back(Obstacle(700, 950, 60, 60));
+    obstacles_.push_back(Obstacle(1240, 950, 60, 60));
+    obstacles_.push_back(Obstacle(500, 650, 60, 60));
+    obstacles_.push_back(Obstacle(1440, 650, 60, 60));
+    
+    // === ADDITIONAL PLATFORMS ===
+    // Lower mid platforms
+    obstacles_.push_back(Obstacle(250, 1100, 200, 30));
+    obstacles_.push_back(Obstacle(1550, 1100, 200, 30));
+    
+    // Diagonal cover walls
+    obstacles_.push_back(Obstacle(350, 550, 40, 250));
+    obstacles_.push_back(Obstacle(1610, 550, 40, 250));
+    
+    // Center-left and center-right vertical obstacles
+    obstacles_.push_back(Obstacle(650, 800, 50, 150));
+    obstacles_.push_back(Obstacle(1300, 800, 50, 150));
+    
+    // Small floating platforms for vertical gameplay
+    obstacles_.push_back(Obstacle(100, 400, 100, 30));
+    obstacles_.push_back(Obstacle(1800, 400, 100, 30));
+    obstacles_.push_back(Obstacle(500, 250, 120, 30));
+    obstacles_.push_back(Obstacle(1380, 250, 120, 30));
+    
+    // Top corners cover
+    obstacles_.push_back(Obstacle(50, 50, 100, 100));
+    obstacles_.push_back(Obstacle(1850, 50, 100, 100));
+    
+    // Bottom corners obstacles
+    obstacles_.push_back(Obstacle(100, 1250, 80, 80));
+    obstacles_.push_back(Obstacle(1820, 1250, 80, 80));
+    
+    // === MORE MID-LEVEL OBSTACLES ===
+    // Horizontal cover walls at different heights
+    obstacles_.push_back(Obstacle(800, 600, 150, 40));
+    obstacles_.push_back(Obstacle(1050, 600, 150, 40));
+    
+    // Additional small platforms
+    obstacles_.push_back(Obstacle(300, 750, 100, 25));
+    obstacles_.push_back(Obstacle(1600, 750, 100, 25));
+    
+    // More tactical crates
+    obstacles_.push_back(Obstacle(900, 1150, 70, 70));
+    obstacles_.push_back(Obstacle(1030, 1150, 70, 70));
+}
+
+bool GameState::checkObstacleCollision(float x, float y, float width, float height) const {
+    for (const Obstacle& obs : obstacles_) {
+        // AABB collision detection
+        if (x < obs.x + obs.width &&
+            x + width > obs.x &&
+            y < obs.y + obs.height &&
+            y + height > obs.y) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void GameState::checkBulletObstacleCollisions() {
+    for (Bullet* bullet : bullets_) {
+        if (!bullet->isActive()) continue;
+        
+        // Check if bullet hits any obstacle (bullets are small, use 5x5 hitbox)
+        if (checkObstacleCollision(bullet->getX() - 2.5f, bullet->getY() - 2.5f, 5, 5)) {
+            bullet->setActive(false);
+        }
+    }
+}
+
+void GameState::checkPlayerObstacleCollisions() {
+    // This function now handles edge cases where players might be stuck in obstacles
+    // (e.g., after respawn or network lag)
+    for (Player* player : players_) {
+        if (!player->isAlive()) continue;
+        
+        float currentX = player->getX();
+        float currentY = player->getY();
+        
+        // If player somehow ended up inside an obstacle
+        if (checkObstacleCollision(currentX, currentY, 40, 40)) {
+            // Try to push player out in small increments
+            const float pushStep = 2.0f;
+            bool foundSafe = false;
+            
+            // Try pushing in 8 directions
+            float directions[][2] = {
+                {-1, 0}, {1, 0}, {0, -1}, {0, 1},
+                {-1, -1}, {1, -1}, {-1, 1}, {1, 1}
+            };
+            
+            // Try increasing push distances
+            for (float multiplier = 1.0f; multiplier <= 10.0f && !foundSafe; multiplier += 1.0f) {
+                for (int i = 0; i < 8; i++) {
+                    float testX = currentX + directions[i][0] * pushStep * multiplier;
+                    float testY = currentY + directions[i][1] * pushStep * multiplier;
+                    
+                    if (!checkObstacleCollision(testX, testY, 40, 40)) {
+                        player->setPosition(testX, testY);
+                        foundSafe = true;
+                        break;
+                    }
+                }
+            }
+            
+            // Always stop movement when stuck
+            player->setVelocity(0, 0);
+        }
+    }
+}
+
+void GameState::respawnPlayer(int id) {
+    Player* player = getPlayer(id);
+    if (player && !player->isAlive()) {
+        float spawnX, spawnY;
+        findValidSpawnPosition(spawnX, spawnY);
+        player->respawn(spawnX, spawnY);
+    }
+}
+
+void GameState::findValidSpawnPosition(float& outX, float& outY) const {
+    const float playerSize = 40.0f;
+    int maxAttempts = 100;
+    bool validPosition = false;
+    
+    for (int attempt = 0; attempt < maxAttempts; attempt++) {
+        // Random position within the world bounds (with margins)
+        outX = 50 + (rand() % (int)(worldWidth_ - 100));
+        outY = 50 + (rand() % (int)(worldHeight_ - 100));
+        
+        // Check if this position collides with any obstacle
+        if (!checkObstacleCollision(outX, outY, playerSize, playerSize)) {
+            validPosition = true;
+            break;
+        }
+    }
+    
+    // If we couldn't find a valid position after many attempts, use a safe default
+    if (!validPosition) {
+        outX = worldWidth_ * 0.5f;
+        outY = 100;
     }
 }

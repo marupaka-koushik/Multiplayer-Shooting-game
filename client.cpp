@@ -12,22 +12,26 @@
 
 class GameClient {
 public:
-    GameClient() : playerId_(-1), connected_(false) {}
+    GameClient() : playerId_(-1), connected_(false), inNameEntry_(true), serverIP_("127.0.0.1") {}
     
-    bool initialize(const std::string& serverIP, const std::string& playerName) {
-        // Initialize graphics
-        if (!renderer_.initialize(800, 600, "Mini Militia Clone")) {
+    bool initialize() {
+        // Initialize graphics first
+        if (!renderer_.initialize(800, 600, "Animal Park")) {
             std::cerr << "Failed to initialize renderer" << std::endl;
             return false;
         }
         
+        return true;
+    }
+    
+    bool connectToServer(const std::string& playerName) {
         // Initialize networking
         if (!networkManager_.initializeSocket()) {
             std::cerr << "Failed to initialize networking: " << networkManager_.getLastError() << std::endl;
             return false;
         }
         
-        networkManager_.setServerAddress(serverIP, SERVER_PORT);
+        networkManager_.setServerAddress(serverIP_, SERVER_PORT);
         playerName_ = playerName;
         
         // Send join request
@@ -38,42 +42,114 @@ public:
         
         networkManager_.sendMessage(joinMessage, networkManager_.getServerAddress());
         
-        std::cout << "Connected to server: " << serverIP << ":" << SERVER_PORT << std::endl;
+        std::cout << "Connected to server: " << serverIP_ << ":" << SERVER_PORT << std::endl;
         connected_ = true;
+        inNameEntry_ = false;
         
         return true;
     }
     
     void run() {
         auto lastUpdate = std::chrono::high_resolution_clock::now();
+        char nameBuffer[32] = {0};
+        int nameLength = 0;
         
-        while (!renderer_.shouldClose() && connected_) {
+        while (!renderer_.shouldClose()) {
             auto currentTime = std::chrono::high_resolution_clock::now();
             float deltaTime = std::chrono::duration<float>(currentTime - lastUpdate).count();
             
             // Cap deltaTime to prevent large jumps
             if (deltaTime > 0.016f) deltaTime = 0.016f;
             
-            // Process network messages first to get player ID and game state
-            processNetworkMessages();
-            
-            // Update camera to follow local player - do this before input handling
-            Player* localPlayer = gameState_.getPlayer(playerId_);
-            if (localPlayer) {
-                renderer_.updateCamera(*localPlayer);
+            if (inNameEntry_) {
+                // Name entry screen
+                BeginDrawing();
+                ClearBackground(Color{20, 20, 40, 255});
+                
+                // Title
+                const char* title = "ANIMAL PARK";
+                int titleWidth = MeasureText(title, 50);
+                DrawText(title, 400 - titleWidth/2, 150, 50, Color{255, 215, 0, 255});
+                
+                // Instructions
+                const char* instruction = "Enter your name:";
+                int instrWidth = MeasureText(instruction, 30);
+                DrawText(instruction, 400 - instrWidth/2, 250, 30, WHITE);
+                
+                // Input box
+                Rectangle inputBox = {250, 300, 300, 50};
+                DrawRectangleRec(inputBox, Color{40, 40, 60, 255});
+                DrawRectangleLinesEx(inputBox, 2, Color{100, 150, 255, 255});
+                
+                // Display entered name
+                if (nameLength > 0) {
+                    DrawText(nameBuffer, 260, 315, 25, WHITE);
+                }
+                
+                // Cursor blink
+                if (((int)(GetTime() * 2)) % 2 == 0) {
+                    int cursorX = 260 + MeasureText(nameBuffer, 25);
+                    DrawLine(cursorX, 310, cursorX, 335, WHITE);
+                }
+                
+                // Instructions to start
+                const char* startInstr = "Press ENTER to join the game";
+                int startWidth = MeasureText(startInstr, 20);
+                DrawText(startInstr, 400 - startWidth/2, 400, 20, Color{150, 150, 150, 255});
+                
+                EndDrawing();
+                
+                // Handle text input
+                int key = GetCharPressed();
+                while (key > 0) {
+                    // Only allow alphanumeric and space
+                    if ((key >= 32) && (key <= 125) && (nameLength < 31)) {
+                        nameBuffer[nameLength] = (char)key;
+                        nameLength++;
+                        nameBuffer[nameLength] = '\0';
+                    }
+                    key = GetCharPressed();
+                }
+                
+                // Handle backspace
+                if (IsKeyPressed(KEY_BACKSPACE) && nameLength > 0) {
+                    nameLength--;
+                    nameBuffer[nameLength] = '\0';
+                }
+                
+                // Handle enter to join
+                if (IsKeyPressed(KEY_ENTER) && nameLength > 0) {
+                    std::string playerName(nameBuffer);
+                    if (connectToServer(playerName)) {
+                        std::cout << "Joining game as: " << playerName << std::endl;
+                    } else {
+                        std::cerr << "Failed to connect to server" << std::endl;
+                        break;
+                    }
+                }
+            } else if (connected_) {
+                // Game is running
+                // Process network messages first to get player ID and game state
+                processNetworkMessages();
+                
+                // Update camera to follow local player - do this before input handling
+                Player* localPlayer = gameState_.getPlayer(playerId_);
+                if (localPlayer) {
+                    renderer_.updateCamera(*localPlayer);
+                }
+                
+                // Handle input only if we have a valid player ID
+                if (playerId_ != -1) {
+                    inputHandler_.update();
+                    handleInput();
+                }
+                
+                // Update local game state (prediction)
+                gameState_.update(deltaTime);
+                
+                // Render everything in one go, passing local player ID
+                renderer_.render(gameState_, playerId_);
             }
-            
-            // Handle input only if we have a valid player ID
-            if (playerId_ != -1) {
-                inputHandler_.update();
-                handleInput();
-            }
-            
-            // Update local game state (prediction)
-            gameState_.update(deltaTime);
-            
-            // Render everything in one go, passing local player ID
-            renderer_.render(gameState_, playerId_);
             
             lastUpdate = currentTime;
         }
@@ -100,8 +176,10 @@ private:
     NetworkManager networkManager_;
     
     std::string playerName_;
+    std::string serverIP_;
     int playerId_;
     bool connected_;
+    bool inNameEntry_;
     
     void handleInput() {
         InputState input = inputHandler_.getInputState();
@@ -218,25 +296,9 @@ private:
 };
 
 int main(int argc, char* argv[]) {
-    std::string serverIP = "127.0.0.1";
-    std::string playerName;
-    
-    // Get server IP from command line
-    if (argc > 1) {
-        serverIP = argv[1];
-    }
-    
-    // Get player name
-    std::cout << "Enter your name: ";
-    std::getline(std::cin, playerName);
-    
-    if (playerName.empty()) {
-        playerName = "Player";
-    }
-    
     GameClient client;
     
-    if (!client.initialize(serverIP, playerName)) {
+    if (!client.initialize()) {
         return -1;
     }
     
