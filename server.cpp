@@ -95,10 +95,19 @@ private:
             case MessageType::PLAYER_MOVE: {
                 Player* player = gameState_.getPlayer(message.playerId);
                 if (player && player->isAlive()) {
-                    // Parse movement data: "LEFT,RIGHT,UP,DOWN," or "STOP,"
+                    // Parse movement data: "LEFT,RIGHT,UP,DOWN,ANGLE:value" or "STOP,ANGLE:value"
                     std::string moveData = message.data;
                     float velX = 0, velY = 0;
                     float moveSpeed = 200.0f;
+                    float angle = 0;
+                    
+                    // Extract angle if present
+                    size_t anglePos = moveData.find("ANGLE:");
+                    if (anglePos != std::string::npos) {
+                        std::string angleStr = moveData.substr(anglePos + 6); // Skip "ANGLE:"
+                        angle = std::stof(angleStr);
+                        player->setAngle(angle);
+                    }
                     
                     if (moveData.find("STOP") != std::string::npos) {
                         // Player stopped moving

@@ -185,8 +185,8 @@ void GameRenderer::renderBullet(const Bullet& bullet) {
     Vector2 position = {bullet.getX(), bullet.getY()};
     
     // Draw bullet with glow effect
-    DrawCircleV(position, 4, Color{255, 255, 0, 100}); // Outer glow
-    DrawCircleV(position, 2, Color{255, 255, 100, 255}); // Inner bullet
+    DrawCircleV(position, 4, Color{255, 0, 0, 100}); // Outer glow (red)
+    DrawCircleV(position, 2, Color{255, 50, 50, 255}); // Inner bullet (red)
 }
 
 void GameRenderer::renderUI(const GameState& gameState) {

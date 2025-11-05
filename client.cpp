@@ -168,29 +168,26 @@ private:
             networkManager_.sendMessage(shootMessage, networkManager_.getServerAddress());
         }
         
-        // Send input to server (for multiplayer sync) - only send if there's actual movement
+        // Always send movement and angle to server for multiplayer sync
+        NetworkMessage moveMessage;
+        moveMessage.type = MessageType::PLAYER_MOVE;
+        moveMessage.playerId = playerId_;
+        
+        std::ostringstream oss;
         if (IsKeyDown(KEY_A) || IsKeyDown(KEY_D) || IsKeyDown(KEY_W) || IsKeyDown(KEY_S)) {
-            NetworkMessage moveMessage;
-            moveMessage.type = MessageType::PLAYER_MOVE;
-            moveMessage.playerId = playerId_;
-            
-            std::string moveData = "";
-            if (IsKeyDown(KEY_A)) moveData += "LEFT,";
-            if (IsKeyDown(KEY_D)) moveData += "RIGHT,";
-            if (IsKeyDown(KEY_W)) moveData += "UP,";
-            if (IsKeyDown(KEY_S)) moveData += "DOWN,";
-            
-            moveMessage.data = moveData;
-            
-            networkManager_.sendMessage(moveMessage, networkManager_.getServerAddress());
+            // Send movement with angle
+            if (IsKeyDown(KEY_A)) oss << "LEFT,";
+            if (IsKeyDown(KEY_D)) oss << "RIGHT,";
+            if (IsKeyDown(KEY_W)) oss << "UP,";
+            if (IsKeyDown(KEY_S)) oss << "DOWN,";
         } else {
-            // Send stop movement message when no keys are pressed
-            NetworkMessage moveMessage;
-            moveMessage.type = MessageType::PLAYER_MOVE;
-            moveMessage.playerId = playerId_;
-            moveMessage.data = "STOP,";
-            networkManager_.sendMessage(moveMessage, networkManager_.getServerAddress());
+            oss << "STOP,";
         }
+        // Append angle to movement data
+        oss << "ANGLE:" << angle;
+        moveMessage.data = oss.str();
+        
+        networkManager_.sendMessage(moveMessage, networkManager_.getServerAddress());
     }
     
     void processNetworkMessages() {
